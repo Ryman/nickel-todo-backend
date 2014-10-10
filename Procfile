@@ -1,0 +1,1 @@
+web: ./target/todo-backend

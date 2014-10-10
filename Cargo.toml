@@ -1,0 +1,13 @@
+[package]
+
+name = "todo-backend"
+version = "0.0.1"
+authors = ["Kevin Butler <haqkrs@gmail.com>"]
+
+[dependencies.nickel]
+
+path = "../nickel.rs/"
+
+[dependencies.nickel_macros]
+
+git = "https://github.com/nickel-org/nickel.git"

@@ -1,0 +1,71 @@
+[root]
+name = "todo-backend"
+version = "0.0.1"
+dependencies = [
+ "nickel 0.1.0",
+ "nickel_macros 0.0.1 (git+https://github.com/nickel-org/nickel.git#add8301f26b65d309bf143cb2bc18d618ffc3da5)",
+]
+
+[[package]]
+name = "anymap"
+version = "0.9.0"
+source = "git+https://github.com/chris-morgan/anymap.git#512885e502985a30a5b64e881f6f3af5a901d301"
+
+[[package]]
+name = "encoding"
+version = "0.1.0"
+source = "git+https://github.com/lifthrasiir/rust-encoding#ff55916fec8b5bf8667a74d5a060c8c951f28fe0"
+
+[[package]]
+name = "groupable"
+version = "0.1.0"
+source = "git+https://github.com/Ryman/groupable-rs#ae2a086edb0b10a7e5f143405d072871e75a118e"
+
+[[package]]
+name = "http"
+version = "0.1.0-pre"
+source = "git+https://github.com/chris-morgan/rust-http.git#5bcd379e435b05e7b30bfb403d176fef01937038"
+dependencies = [
+ "openssl 0.0.0 (git+https://github.com/sfackler/rust-openssl.git#93b725ea8d48b772bd55f4e5bfcb24165daeaf65)",
+ "url 0.1.0 (git+https://github.com/servo/rust-url#55b18b796ef2cef5490069dd450c60c2cc2c0c1b)",
+]
+
+[[package]]
+name = "nickel"
+version = "0.1.0"
+dependencies = [
+ "anymap 0.9.0 (git+https://github.com/chris-morgan/anymap.git#512885e502985a30a5b64e881f6f3af5a901d301)",
+ "groupable 0.1.0 (git+https://github.com/Ryman/groupable-rs#ae2a086edb0b10a7e5f143405d072871e75a118e)",
+ "http 0.1.0-pre (git+https://github.com/chris-morgan/rust-http.git#5bcd379e435b05e7b30bfb403d176fef01937038)",
+ "nickel_macros 0.0.1",
+ "rust-mustache 0.3.0 (git+https://github.com/pythonesque/rust-mustache.git#af44dbee522ea1eec931fbc9946c7621b754c126)",
+ "url 0.1.0 (git+https://github.com/servo/rust-url#55b18b796ef2cef5490069dd450c60c2cc2c0c1b)",
+]
+
+[[package]]
+name = "nickel_macros"
+version = "0.0.1"
+
+[[package]]
+name = "nickel_macros"
+version = "0.0.1"
+source = "git+https://github.com/nickel-org/nickel.git#add8301f26b65d309bf143cb2bc18d618ffc3da5"
+
+[[package]]
+name = "openssl"
+version = "0.0.0"
+source = "git+https://github.com/sfackler/rust-openssl.git#93b725ea8d48b772bd55f4e5bfcb24165daeaf65"
+
+[[package]]
+name = "rust-mustache"
+version = "0.3.0"
+source = "git+https://github.com/pythonesque/rust-mustache.git#af44dbee522ea1eec931fbc9946c7621b754c126"
+
+[[package]]
+name = "url"
+version = "0.1.0"
+source = "git+https://github.com/servo/rust-url#55b18b796ef2cef5490069dd450c60c2cc2c0c1b"
+dependencies = [
+ "encoding 0.1.0 (git+https://github.com/lifthrasiir/rust-encoding#ff55916fec8b5bf8667a74d5a060c8c951f28fe0)",
+]
+
