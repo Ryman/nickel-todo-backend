@@ -131,5 +131,5 @@ fn main() {
     // Get port from heroku env
     let port = getenv("PORT").and_then(|s| from_str::<u16>(s.as_slice().trim())).unwrap_or(6767);
     println!("Binding to port: {}", port)
-    server.listen(Ipv4Addr(127, 0, 0, 1), port);
+    server.listen(Ipv4Addr(0, 0, 0, 0), port);
 }
