@@ -6,8 +6,5 @@ authors = ["Kevin Butler <haqkrs@gmail.com>"]
 
 [dependencies.nickel]
 
-git = "https://github.com/nickel-org/nickel.git"
-
-[dependencies.nickel_macros]
-
-git = "https://github.com/nickel-org/nickel.git"
+git = "https://github.com/Ryman/nickel.rs.git"
+branch = "temp_http"
