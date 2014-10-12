@@ -78,6 +78,9 @@ fn main() {
         }
 
         post "/todos" => |request, response| {
+            response.origin.headers.insert_raw("Access-Control-Allow-Headers".to_string(), b"content-type");
+            response.origin.headers.insert_raw("Access-Control-Allow-Origin".to_string(), b"*");
+
             println!("{}", request.origin.body.as_slice());
             // new_todo = json_body
             // stored_todo = @repo.add_todo(new_todo)
