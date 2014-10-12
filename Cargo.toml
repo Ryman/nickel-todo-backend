@@ -6,5 +6,20 @@ authors = ["Kevin Butler <haqkrs@gmail.com>"]
 
 [dependencies.nickel]
 
-git = "https://github.com/Ryman/nickel.rs.git"
-branch = "temp_http"
+git = "https://github.com/nickel-org/nickel.rs.git"
+
+[dependencies.nickel_macros]
+
+git = "https://github.com/nickel-org/nickel.rs.git"
+
+[dependencies.postgres]
+
+git = "https://github.com/sfackler/rust-postgres.git"
+
+[dependencies.nickel_postgres]
+
+git = "https://github.com/Ryman/nickel-postgres.git"
+
+[dependencies.http]
+
+git = "https://github.com/chris-morgan/rust-http.git"
