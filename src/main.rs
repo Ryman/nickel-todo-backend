@@ -44,6 +44,14 @@ fn custom_404(err: &NickelError, _req: &Request, response: &mut Response) -> Mid
     }
 }
 
+//this is how to overwrite the default error handler to handle 404 cases with a custom view
+#[cfg(not(test))]
+fn allow_cors(_req: &Request, response: &mut Response) -> MiddlewareResult {
+    response.origin.headers.insert_raw("Access-Control-Allow-Headers".to_string(), b"content-type");
+    response.origin.headers.insert_raw("Access-Control-Allow-Origin".to_string(), b"*");
+    Ok(Continue)
+}
+
 #[cfg(not(test))]
 fn main() {
     let mut server = Nickel::new();
@@ -51,10 +59,9 @@ fn main() {
     // middleware is optional and can be registered with `utilize`
     server.utilize(logger);
 
+    server.utilize(allow_cors);
+
     fn options_handler(req: &Request, res: &mut Response) {
-        //res.origin.headers.insert_raw("access-control-allow-origin".to_string(), b"*");
-        res.origin.headers.insert_raw("Access-Control-Allow-Headers".to_string(), b"content-type");
-        res.origin.headers.insert_raw("Access-Control-Allow-Origin".to_string(), b"*");
         res.origin.headers.insert_raw("Access-Control-Allow-Methods".to_string(), b"GET,HEAD,POST,DELETE,OPTIONS,PUT");
     }
 
@@ -72,15 +79,10 @@ fn main() {
     server.utilize(router! {
         get "/todos" => |request, response| {
             // if env.has_key? "HTTP_ACCESS_CONTROL_REQUEST_HEADERS"
-            response.origin.headers.insert_raw("Access-Control-Allow-Headers".to_string(), b"content-type");
-            response.origin.headers.insert_raw("Access-Control-Allow-Origin".to_string(), b"*");
             response.send("{}");
         }
 
         post "/todos" => |request, response| {
-            response.origin.headers.insert_raw("Access-Control-Allow-Headers".to_string(), b"content-type");
-            response.origin.headers.insert_raw("Access-Control-Allow-Origin".to_string(), b"*");
-
             println!("{}", request.origin.body.as_slice());
             // new_todo = json_body
             // stored_todo = @repo.add_todo(new_todo)
