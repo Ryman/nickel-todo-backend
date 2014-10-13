@@ -109,17 +109,17 @@ fn custom_404(err: &NickelError, _req: &Request, response: &mut Response) -> Mid
 //this is how to overwrite the default error handler to handle 404 cases with a custom view
 #[cfg(not(test))]
 fn enable_cors(_req: &Request, response: &mut Response) -> MiddlewareResult {
-    response.origin.headers.insert_raw("Access-Control-Allow-Headers".to_string(), b"content-type");
-    response.origin.headers.insert_raw("Access-Control-Allow-Origin".to_string(), b"*");
+    let _ = response.origin.headers.insert_raw("Access-Control-Allow-Headers".to_string(), b"content-type");
+    let _ = response.origin.headers.insert_raw("Access-Control-Allow-Origin".to_string(), b"*");
     Ok(Continue)
 }
 
-fn options_handler(req: &Request, res: &mut Response) {
-    res.origin.headers.insert_raw("Access-Control-Allow-Methods".to_string(), b"GET,HEAD,POST,DELETE,OPTIONS,PUT");
+fn options_handler(_: &Request, res: &mut Response) {
+    let _ = res.origin.headers.insert_raw("Access-Control-Allow-Methods".to_string(), b"GET,HEAD,POST,DELETE,OPTIONS,PUT");
 }
 
-fn item_options_handler(req: &Request, res: &mut Response) {
-    res.origin.headers.insert_raw("Access-Control-Allow-Methods".to_string(), b"GET,PATCH,HEAD,DELETE,OPTIONS");
+fn item_options_handler(_: &Request, res: &mut Response) {
+    let _ = res.origin.headers.insert_raw("Access-Control-Allow-Methods".to_string(), b"GET,PATCH,HEAD,DELETE,OPTIONS");
 }
 
 fn patch_handler(request: &Request, response: &mut Response) {
@@ -128,7 +128,7 @@ fn patch_handler(request: &Request, response: &mut Response) {
 
     if let Some(mut todo) = find_todo(request, response) {
         let db_conn = request.db_conn();
-        let mut diff = request.json_as::<Todo>().unwrap();
+        let diff = request.json_as::<Todo>().unwrap();
 
         println!("BEFORE: {}", json::encode(&todo.to_json()))
         todo.merge(diff);
