@@ -1,4 +1,4 @@
-#![feature(phase)]
+#![feature(phase, if_let)]
 #![allow(unused_imports)]
 extern crate http;
 extern crate nickel;
@@ -22,23 +22,64 @@ use postgres::pool::PostgresConnectionPool;
 use postgres::types::ToSql;
 use openssl::ssl;
 use time::Timespec;
-
-// #[deriving(Decodable, Encodable)]
-// struct Person {
-//     firstname: String,
-//     lastname:  String,
-// }
-
-#[deriving(Decodable,Encodable)]
-pub struct Person {
-    pub id: i32,
-    pub name: String,
-    pub created: Timespec
-}
+use serialize::json::ToJson;
+use serialize::json;
+use std::collections::TreeMap;
 
 #[deriving(Decodable)]
-pub struct PersonByPost {
-    pub title: String
+pub struct Todo {
+    uid: Option<i32>,
+    title: Option<String>,
+    order: Option<i32>,
+    completed: Option<bool>,
+}
+
+impl Todo {
+    pub fn title(&self) -> &str {
+        match self.title {
+            Some(ref title) => title.as_slice(),
+            None => ""
+        }
+    }
+
+    pub fn order(&self) -> i32 {
+        self.order.unwrap_or(0)
+    }
+
+    pub fn completed(&self) -> bool {
+        self.completed.unwrap_or(false)
+    }
+
+    pub fn merge(&mut self, other: Todo) {
+        if other.title.is_some() {
+            self.title = other.title;
+        }
+        if other.order.is_some() {
+            self.order = other.order
+        }
+        if other.completed.is_some() {
+            self.completed = other.completed
+        }
+    }
+}
+
+// Specify encoding method manually
+impl ToJson for Todo {
+    fn to_json(&self) -> json::Json {
+        let mut d = TreeMap::new();
+        // All standard types implement `to_json()`, so use it
+        d.insert("title".to_string(), self.title().to_string().to_json());
+        d.insert("order".to_string(), self.order().to_json());
+        d.insert("completed".to_string(), self.completed().to_json());
+
+        if let Some(uid) = self.uid {
+            d.insert("uid".to_string(), uid.to_json());
+            // FIXME: use base_url from a config
+            d.insert("url".to_string(), format!("http://2588bf84.ngrok.com/todos/{}", uid).to_json());
+        }
+
+        json::Object(d)
+    }
 }
 
 //this is an example middleware function that just logs each request
@@ -77,6 +118,70 @@ fn options_handler(req: &Request, res: &mut Response) {
     res.origin.headers.insert_raw("Access-Control-Allow-Methods".to_string(), b"GET,HEAD,POST,DELETE,OPTIONS,PUT");
 }
 
+fn item_options_handler(req: &Request, res: &mut Response) {
+    res.origin.headers.insert_raw("Access-Control-Allow-Methods".to_string(), b"GET,PATCH,HEAD,DELETE,OPTIONS");
+}
+
+fn patch_handler(request: &Request, response: &mut Response) {
+    println!("Handling PATCH/POST")
+    println!("{}", request.origin.body.as_slice());
+
+    if let Some(mut todo) = find_todo(request, response) {
+        let db_conn = request.db_conn();
+        let mut diff = request.json_as::<Todo>().unwrap();
+
+        println!("BEFORE: {}", json::encode(&todo.to_json()))
+        todo.merge(diff);
+        println!("AFTER: {}", json::encode(&todo.to_json()))
+
+        let stmt = db_conn.prepare("UPDATE todos SET title = $1, order_idx = $2, completed = $3 WHERE uid = $4").unwrap();
+
+        let changes = stmt.execute([&todo.title() as &ToSql,
+                                   &todo.order() as &ToSql,
+                                   &todo.completed() as &ToSql,
+                                   &todo.uid.unwrap() as &ToSql]).unwrap();
+
+        if changes == 0 {
+            response.origin.status = http::status::NotFound;
+        } else if changes > 1 {
+            println!("INTERNAL SERVER ERROR")
+            response.origin.status = http::status::InternalServerError;
+        } else {
+            response.send(json::encode(&todo.to_json()))
+        }
+    }
+}
+
+fn find_todo(request: &Request, response: &mut Response) -> Option<Todo> {
+    let db_conn = request.db_conn();
+    let stmt = db_conn.prepare("SELECT uid, title, order_idx, completed FROM todos WHERE uid = $1").unwrap();
+    let uid = from_str::<i32>(request.param("uid").trim());
+    let mut iter = stmt.query([&uid as &ToSql]).unwrap();
+
+    match (iter.next(), iter.next()) {
+        (Some(select), None) => {
+            let todo = Todo {
+                uid: select.get(0u),
+                title: Some(select.get(1u)),
+                order: select.get(2u),
+                completed: select.get(3u),
+            };
+            Some(todo)
+        }
+        // Just a 404
+        (None, None) => {
+            response.origin.status = http::status::NotFound;
+            None
+        }
+        // Shouldn't get multiple for a uid
+        (Some(_), Some(_)) | (None, Some(_)) => {
+            println!("BADBAD: {} gave multiple results", uid)
+            response.origin.status = http::status::InternalServerError;
+            None
+        }
+    }
+}
+
 #[cfg(not(test))]
 fn main() {
     let mut server = Nickel::new();
@@ -90,63 +195,86 @@ fn main() {
     initialise_db_tables(postgres_middleware.pool.clone());
     server.utilize(postgres_middleware);
 
-    server.add_route(method::Options, "/todos", options_handler);
-
     server.utilize(Nickel::json_body_parser());
 
     server.utilize(Nickel::query_string());
 
-    server.utilize(router! {
+    let mut router = router! {
         get "/todos" => |request, response| {
-            // if env.has_key? "HTTP_ACCESS_CONTROL_REQUEST_HEADERS"
-
             let db_conn = request.db_conn();
-            let stmt = db_conn.prepare("SELECT id, name, created FROM person").unwrap();
+            let stmt = db_conn.prepare("SELECT uid, title, order_idx, completed FROM todos").unwrap();
 
-            let mut iter = stmt.query([]).unwrap();
+            let todos = stmt.query([]).unwrap().map(|select| {
+                Todo {
+                    uid: select.get(0u),
+                    title: select.get(1u),
+                    order: select.get(2u),
+                    completed: select.get(3u),
+                }
+            }).collect::<Vec<_>>();
 
-            let mut persons: Vec<Person> = Vec::new();
-            for select in iter {
-                let person = Person {
-                    id: select.get(0u),
-                    name: select.get(1u),
-                    created: select.get(2u)
-                };
-                persons.push(person);
-            }
-            let num_persons = persons.len();
-            if num_persons == 0 {
-                response.origin.status = http::status::Ok;
-                response.send("{}");
-            }
-            else {
-                response.origin.status = http::status::Ok;
-                response.send("{many}");
+            response.send(json::encode(&todos.to_json()))
+        }
+
+        get "/todos/:uid" => |request, response| {
+            if let Some(todo) = find_todo(request, response) {
+                response.send(json::encode(&todo.to_json()))
             }
         }
 
         post "/todos" => |request, response| {
             println!("{}", request.origin.body.as_slice());
-            // new_todo = json_body
-            // stored_todo = @repo.add_todo(new_todo)
-            // headers["Location"] = todo_url(stored_todo)
-            // status 201
-            // # content_type :json
-            // todo_repr(stored_todo).to_json
-            //response.send(r#"{"title": "a todo"}"#)
-            let person: PersonByPost = request.json_as::<PersonByPost>().unwrap();
+
+            let mut todo = request.json_as::<Todo>().unwrap();
             let db_conn = request.db_conn();
-            let inserts = db_conn.execute("INSERT INTO person (name, created) VALUES ( $1, $2 )",
-                                        [&person.title.as_slice() as &ToSql, &time::get_time() as &ToSql]).unwrap();
-            if inserts == 0 {
-                response.origin.status = http::status::NotFound;
+            let stmt = db_conn.prepare("INSERT INTO todos (title, order_idx, completed) VALUES ( $1, $2, $3 ) RETURNING uid").unwrap();
+
+            let mut iter = stmt.query([&todo.title() as &ToSql,
+                                       &todo.order() as &ToSql,
+                                       &todo.completed() as &ToSql]).unwrap();
+
+            match (iter.next(), iter.next()) {
+                (Some(select), None) => todo.uid = Some(select.get(0u)),
+                // Should have one and only one uid from an insert
+                (Some(_), Some(_)) | (None, Some(_)) | (None, None) => {
+                    response.origin.status = http::status::InternalServerError;
+                    return
+                }
             }
-            else if inserts > 1 {
-                response.origin.status = http::status::InternalServerError;
-            }
-            response.send(format!("{} persons were inserted", inserts).as_slice())
+
+            response.send(json::encode(&todo.to_json()))
         }
-    });
+
+        delete "/todos" => |request, response| {
+            let db_conn = request.db_conn();
+            let deletes = db_conn.execute("TRUNCATE todos", []).unwrap();
+
+            println!("DELETED ALL TODOS");
+            response.send("{}")
+        }
+
+        delete "/todos/:uid" => |request, response| {
+            let db_conn = request.db_conn();
+            let uid = from_str::<i32>(request.param("uid").trim()).unwrap();
+            let deletes = db_conn.execute("DELETE FROM todos * WHERE uid = $1", [&uid as &ToSql]).unwrap();
+
+            if deletes == 0 {
+                response.origin.status = http::status::NotFound;
+            } else if deletes > 1 {
+                response.origin.status = http::status::InternalServerError;
+            } else {
+                println!("DELETED TODO {}", uid);
+                response.send("{}")
+            }
+        }
+    };
+
+    router.add_route(method::Patch, "/todos/:uid", patch_handler);
+    router.add_route(method::Post, "/todos/:uid", patch_handler);
+    router.add_route(method::Options, "/todos", options_handler);
+    router.add_route(method::Options, "/todos/:uid", item_options_handler);
+
+    server.utilize(router);
 
     server.handle_error(custom_404);
 
@@ -161,19 +289,12 @@ fn main() {
 //initialise database tables, if has not already been done
 fn initialise_db_tables (db_pool_instance: PostgresConnectionPool) {
     let db_conn = db_pool_instance.get_connection();
-    db_conn.execute("CREATE TABLE IF NOT EXISTS person (
-            id SERIAL PRIMARY KEY,
-            name VARCHAR NOT NULL,
-            created TIMESTAMP NOT NULL
-    )", []).unwrap();
-    db_conn.execute("CREATE TABLE IF NOT EXISTS post (
-            id SERIAL PRIMARY KEY,
+    //db_conn.execute("DROP TABLE IF EXISTS todos;", []).unwrap();
+    db_conn.execute("CREATE TABLE IF NOT EXISTS todos (
+            uid SERIAL PRIMARY KEY,
             title VARCHAR NOT NULL,
-            text VARCHAR NOT NULL
-    )", []).unwrap();
-    db_conn.execute("CREATE TABLE IF NOT EXISTS comment (
-            id SERIAL PRIMARY KEY,
-            text VARCHAR NOT NULL,
-            post_id SERIAL REFERENCES post (id)
+            order_idx INTEGER DEFAULT 0,
+            completed BOOL DEFAULT FALSE
+
     )", []).unwrap();
 }
