@@ -3,6 +3,7 @@ name = "todo-backend"
 version = "0.0.1"
 dependencies = [
  "http 0.1.0-pre (git+https://github.com/chris-morgan/rust-http.git#b929e4c16f9cff0d1c7334a2b39320be354fa0b0)",
+ "lazy_static 0.1.0 (git+https://github.com/Kimundi/lazy-static.rs#e62a65372f1dd9019e37eb9381d819edff80e360)",
  "nickel 0.1.0 (git+https://github.com/nickel-org/nickel.rs.git#c1bb3e17306c8d499c9657020254b4ae9abe7f0a)",
  "nickel_macros 0.0.1 (git+https://github.com/nickel-org/nickel.rs.git#c1bb3e17306c8d499c9657020254b4ae9abe7f0a)",
  "nickel_postgres 0.0.0 (git+https://github.com/Ryman/nickel-postgres.git#35d1d7cc1e9a5d1afed0fe609476baa93b468997)",
@@ -32,6 +33,11 @@ dependencies = [
  "openssl 0.0.0 (git+https://github.com/sfackler/rust-openssl.git#12b7427e0d01cb92810db2f0f51972b34947128e)",
  "url 0.1.0 (git+https://github.com/servo/rust-url.git#55b18b796ef2cef5490069dd450c60c2cc2c0c1b)",
 ]
+
+[[package]]
+name = "lazy_static"
+version = "0.1.0"
+source = "git+https://github.com/Kimundi/lazy-static.rs#e62a65372f1dd9019e37eb9381d819edff80e360"
 
 [[package]]
 name = "nickel"

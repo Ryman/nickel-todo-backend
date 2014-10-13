@@ -8,6 +8,7 @@ extern crate postgres;
 extern crate nickel_postgres;
 extern crate openssl;
 extern crate time;
+#[phase(plugin)] extern crate lazy_static;
 
 use http::status::NotFound;
 use nickel::{
@@ -25,6 +26,20 @@ use time::Timespec;
 use serialize::json::ToJson;
 use serialize::json;
 use std::collections::TreeMap;
+
+lazy_static! {
+    static ref SITE_ROOT_URL: String = {
+        let mut root = getenv("SITE_ROOT_URL").unwrap_or_else(|| "http://0.0.0.0:6767/".to_string());
+
+        if root.len() == 0 {
+            fail!("Cannot supply an empty `SITE_ROOT_URL`")
+        }
+
+        // Ensure slash termination
+        if root.as_bytes().last() != Some(&b'/') { root.push('/'); }
+        root
+    };
+}
 
 #[deriving(Decodable)]
 pub struct Todo {
@@ -75,7 +90,7 @@ impl ToJson for Todo {
         if let Some(uid) = self.uid {
             d.insert("uid".to_string(), uid.to_json());
             // FIXME: use base_url from a config
-            d.insert("url".to_string(), format!("http://2588bf84.ngrok.com/todos/{}", uid).to_json());
+            d.insert("url".to_string(), format!("{}todos/{}", *SITE_ROOT_URL, uid).to_json());
         }
 
         json::Object(d)
