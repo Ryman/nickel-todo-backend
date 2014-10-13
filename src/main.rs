@@ -9,6 +9,7 @@ extern crate nickel_postgres;
 extern crate openssl;
 extern crate time;
 #[phase(plugin)] extern crate lazy_static;
+extern crate r2d2;
 
 use http::status::NotFound;
 use nickel::{
@@ -206,8 +207,8 @@ fn main() {
     server.utilize(enable_cors);
     let ssl_context = ssl::SslContext::new(ssl::Tlsv1).unwrap();
     let postgres_url = getenv("DATABASE_URL").unwrap();
-    let postgres_middleware: PostgresMiddleware = PostgresMiddleware::new(postgres_url.as_slice(), postgres::PreferSsl(ssl_context), 5);
-    initialise_db_tables(postgres_middleware.pool.clone());
+    let postgres_middleware = PostgresMiddleware::new(postgres_url.as_slice(), postgres::PreferSsl(ssl_context), 5, r2d2::NoopErrorHandler);
+    initialise_db(&postgres_middleware);
     server.utilize(postgres_middleware);
 
     server.utilize(Nickel::json_body_parser());
@@ -302,8 +303,8 @@ fn main() {
 }
 
 //initialise database tables, if has not already been done
-fn initialise_db_tables (db_pool_instance: PostgresConnectionPool) {
-    let db_conn = db_pool_instance.get_connection();
+fn initialise_db(db_middleware: &PostgresMiddleware<r2d2::NoopErrorHandler>) {
+    let db_conn = db_middleware.pool.get().unwrap();
     //db_conn.execute("DROP TABLE IF EXISTS todos;", []).unwrap();
     db_conn.execute("CREATE TABLE IF NOT EXISTS todos (
             uid SERIAL PRIMARY KEY,
