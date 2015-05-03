@@ -4,26 +4,15 @@ name = "todo-backend"
 version = "0.0.1"
 authors = ["Kevin Butler <haqkrs@gmail.com>"]
 
-[dependencies.nickel]
-
-git = "https://github.com/nickel-org/nickel.rs.git"
-
-[dependencies.nickel_macros]
-
-git = "https://github.com/nickel-org/nickel.rs.git"
-
-[dependencies.postgres]
-
-git = "https://github.com/sfackler/rust-postgres.git"
+[dependencies]
+nickel = "*"
+postgres = "*"
+lazy_static = "*"
+rustc-serialize = "*"
+openssl = "*"
+r2d2 = "*"
+time = "*"
+hyper = "*"
 
 [dependencies.nickel_postgres]
-
-git = "https://github.com/Ryman/nickel-postgres.git"
-
-[dependencies.http]
-
-git = "https://github.com/chris-morgan/rust-http.git"
-
-[dependencies.lazy_static]
-
-git = "https://github.com/Kimundi/lazy-static.rs"
+git = "https://github.com/nickel-org/nickel-postgres.git"
