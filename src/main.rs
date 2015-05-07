@@ -21,11 +21,14 @@ use unicase::UniCase;
 use nickel_postgres::{PostgresMiddleware, PostgresRequestExtensions};
 use postgres::SslMode;
 use openssl::ssl::{SslMethod, SslContext};
-use rustc_serialize::json::{self, Json, ToJson};
-use std::collections::BTreeMap;
+use rustc_serialize::json::{Json, ToJson};
+
+use todo::Todo;
+
+mod todo;
 
 lazy_static! {
-    static ref SITE_ROOT_URL: String = {
+    pub static ref SITE_ROOT_URL: String = {
         let mut root = env::var("SITE_ROOT_URL").unwrap_or_else(|_| "http://0.0.0.0:6767/".to_string());
 
         if root.is_empty() {
@@ -36,69 +39,6 @@ lazy_static! {
         if root.as_bytes().last() != Some(&b'/') { root.push('/'); }
         root
     };
-}
-
-#[derive(RustcDecodable)]
-pub struct Todo {
-    uid: Option<i32>,
-    title: Option<String>,
-    order: Option<i32>,
-    completed: Option<bool>,
-}
-
-impl Todo {
-    pub fn title(&self) -> &str {
-        self.title.as_ref().map_or("", |s| &*s)
-    }
-
-    pub fn order(&self) -> i32 {
-        self.order.unwrap_or(0)
-    }
-
-    pub fn completed(&self) -> bool {
-        self.completed.unwrap_or(false)
-    }
-
-    pub fn merge(&mut self, other: Todo) {
-        if other.title.is_some() {
-            self.title = other.title;
-        }
-        if other.order.is_some() {
-            self.order = other.order
-        }
-        if other.completed.is_some() {
-            self.completed = other.completed
-        }
-    }
-}
-
-impl<'a> From<postgres::Row<'a>> for Todo {
-    fn from(row: postgres::Row) -> Todo {
-        Todo {
-            uid: row.get(0),
-            title: Some(row.get(1)),
-            order: row.get(2),
-            completed: row.get(3),
-        }
-    }
-}
-
-// Specify encoding method manually
-impl ToJson for Todo {
-    fn to_json(&self) -> json::Json {
-        let mut d = BTreeMap::new();
-        // All standard types implement `to_json()`, so use it
-        d.insert("title".to_string(), self.title().to_json());
-        d.insert("order".to_string(), self.order().to_json());
-        d.insert("completed".to_string(), self.completed().to_json());
-
-        if let Some(uid) = self.uid {
-            d.insert("uid".to_string(), uid.to_json());
-            d.insert("url".to_string(), format!("{}todos/{}", *SITE_ROOT_URL, uid).to_json());
-        }
-
-        Json::Object(d)
-    }
 }
 
 fn find_todo(request: &Request) -> Option<Todo> {
@@ -131,14 +71,14 @@ fn patch_handler<'a>(request: &mut Request, response: Response<'a>) -> Middlewar
             let changes = stmt.execute(&[&todo.title(),
                                         &todo.order(),
                                         &todo.completed(),
-                                        &todo.uid.unwrap()]).unwrap();
+                                        &todo.uid().unwrap()]).unwrap();
 
             if changes == 0 {
                 response.error(StatusCode::NotFound, "")
             } else if changes > 1 {
                 response.error(StatusCode::InternalServerError, "Too many items patched")
             } else {
-                todo.to_json().respond(response)
+                todo.respond(response)
             }
         }
     }
@@ -175,7 +115,7 @@ pub fn main() {
 
         get "/todos/:uid" => |request, response| {
             match find_todo(request) {
-                Some(todo) => todo.to_json(),
+                Some(todo) => todo,
                 None => return response.error(StatusCode::NotFound, "{}")
             }
         }
@@ -191,8 +131,8 @@ pub fn main() {
 
             match (iter.next(), iter.next()) {
                 (Some(select), None) => {
-                    todo.uid = Some(select.get(0));
-                    todo.to_json()
+                    todo.set_uid(select.get(0));
+                    todo
                 },
                 // Should have one and only one uid from an insert
                 _ => return response.error(StatusCode::InternalServerError, "Inserted row count != 1")
