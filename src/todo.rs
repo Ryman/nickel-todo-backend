@@ -60,7 +60,7 @@ impl<'a> From<postgres::Row<'a>> for Todo {
 
 impl ResponseFinalizer for Todo {
     fn respond<'a>(self, response: Response<'a>) -> MiddlewareResult<'a> {
-        self.to_json().respond(response)
+        response.send(self.to_json())
     }
 }
 

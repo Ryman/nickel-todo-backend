@@ -8,14 +8,10 @@ extern crate unicase;
 extern crate hyper;
 extern crate r2d2;
 
-use nickel::{
-    Nickel, Request, Response, QueryString, ResponseFinalizer,
-    HttpRouter, JsonBody, MiddlewareResult
-};
+use nickel::{Nickel, Request, QueryString, HttpRouter, JsonBody};
 use nickel::status::StatusCode;
 
 use std::env;
-use hyper::method::Method;
 use hyper::header;
 use unicase::UniCase;
 use nickel_postgres::{PostgresMiddleware, PostgresRequestExtensions};
@@ -59,31 +55,6 @@ fn find_todo(request: &Request) -> Option<Todo> {
     }
 }
 
-fn patch_handler<'a>(request: &mut Request, response: Response<'a>) -> MiddlewareResult<'a> {
-    match find_todo(request) {
-        None => response.error(StatusCode::NotFound, ""),
-        Some(mut todo) => {
-            let diff = request.json_as::<Todo>().unwrap();
-            todo.merge(diff);
-
-            let db_conn = request.db_conn();
-            let stmt = db_conn.prepare("UPDATE todos SET title = $1, order_idx = $2, completed = $3 WHERE uid = $4").unwrap();
-            let changes = stmt.execute(&[&todo.title(),
-                                        &todo.order(),
-                                        &todo.completed(),
-                                        &todo.uid().unwrap()]).unwrap();
-
-            if changes == 0 {
-                response.error(StatusCode::NotFound, "")
-            } else if changes > 1 {
-                response.error(StatusCode::InternalServerError, "Too many items patched")
-            } else {
-                todo.respond(response)
-            }
-        }
-    }
-}
-
 pub fn main() {
     let mut server = Nickel::new();
 
@@ -100,7 +71,7 @@ pub fn main() {
 
     server.utilize(db_middleware());
 
-    let mut router = router! {
+    server.utilize(router! {
         get "/todos" => |request, response| {
             let db_conn = request.db_conn();
             let stmt = db_conn.prepare("SELECT uid, title, order_idx, completed FROM todos").unwrap();
@@ -161,33 +132,51 @@ pub fn main() {
                 (StatusCode::Ok, "{}")
             }
         }
-    };
 
-    router.add_route(Method::Patch, "/todos/:uid", patch_handler);
-    router.add_route(Method::Post, "/todos/:uid", patch_handler);
+        patch "/todos/:uid" => |request, response| {
+            match find_todo(request) {
+                None => return response.error(StatusCode::NotFound, ""),
+                Some(mut todo) => {
+                    let diff = request.json_as::<Todo>().unwrap();
+                    todo.merge(diff);
 
-    router.add_route(Method::Options, "/todos", middleware! { |req, mut res|
-        let headers = res.origin.headers_mut();
-        headers.set(header::AccessControlAllowMethods(vec![Method::Get,
-                                                           Method::Head,
-                                                           Method::Post,
-                                                           Method::Delete,
-                                                           Method::Options,
-                                                           Method::Put]));
-        "" // start the request
+                    let db_conn = request.db_conn();
+                    let stmt = db_conn.prepare("UPDATE todos SET title = $1, order_idx = $2, completed = $3 WHERE uid = $4").unwrap();
+                    let changes = stmt.execute(&[&todo.title(),
+                                                &todo.order(),
+                                                &todo.completed(),
+                                                &todo.uid().unwrap()]).unwrap();
+
+                    if changes == 0 {
+                        return response.error(StatusCode::NotFound, "")
+                    } else if changes > 1 {
+                        return response.error(StatusCode::InternalServerError, "Too many items patched")
+                    } else {
+                        todo
+                    }
+                }
+            }
+        }
+
+        options "/todos" => |req, res| {
+            use hyper::method::Method::*;
+            // Hack until mut binding is available for res in router! macro
+            let mut res = res;
+            res.origin.headers_mut().set(
+                header::AccessControlAllowMethods(vec![Get, Head, Post, Delete, Options, Put]));
+
+            return res.send("")
+        }
+
+        options "/todos/:uid" => |req, res| {
+            use hyper::method::Method::*;
+            let mut res = res;
+            res.origin.headers_mut().set(
+                header::AccessControlAllowMethods(vec![Get, Patch, Head, Delete, Options]));
+
+            return res.send("")
+        }
     });
-
-    router.add_route(Method::Options, "/todos/:uid", middleware! { |req, mut res|
-        let headers = res.origin.headers_mut();
-        headers.set(header::AccessControlAllowMethods(vec![Method::Get,
-                                                           Method::Patch,
-                                                           Method::Head,
-                                                           Method::Delete,
-                                                           Method::Options]));
-        "" // start the request
-    });
-
-    server.utilize(router);
 
     // Get port from heroku env
     let port = env::var("PORT").unwrap_or_else(|_| "6767".to_string());
