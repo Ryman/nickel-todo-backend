@@ -63,7 +63,7 @@ pub fn main() {
     });
 
     // Enable CORS
-    server.utilize(middleware! { |request, mut response|
+    server.utilize(middleware! { |_, mut response|
         let headers = response.origin.headers_mut();
         headers.set(header::AccessControlAllowHeaders(vec![UniCase("content-type".to_string())]));
         headers.set(header::AccessControlAllowOrigin::Any);
@@ -158,7 +158,7 @@ pub fn main() {
             }
         }
 
-        options "/todos" => |req, res| {
+        options "/todos" => |_, res| {
             use hyper::method::Method::*;
             // Hack until mut binding is available for res in router! macro
             let mut res = res;
@@ -168,7 +168,7 @@ pub fn main() {
             return res.send("")
         }
 
-        options "/todos/:uid" => |req, res| {
+        options "/todos/:uid" => |_, res| {
             use hyper::method::Method::*;
             let mut res = res;
             res.origin.headers_mut().set(
