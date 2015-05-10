@@ -1,4 +1,4 @@
-use nickel::{Response, ResponseFinalizer,MiddlewareResult};
+use nickel::{Response, Responder, MiddlewareResult};
 use rustc_serialize::json::{self, Json, ToJson};
 use std::collections::BTreeMap;
 use postgres;
@@ -58,7 +58,7 @@ impl<'a> From<postgres::Row<'a>> for Todo {
     }
 }
 
-impl ResponseFinalizer for Todo {
+impl Responder for Todo {
     fn respond<'a>(self, response: Response<'a>) -> MiddlewareResult<'a> {
         response.send(self.to_json())
     }
