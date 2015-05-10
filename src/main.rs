@@ -122,19 +122,21 @@ pub fn main() {
             let deletes = db_conn.execute("DELETE FROM todos * WHERE uid = $1",
                                           &[&uid]).unwrap();
 
-            if deletes == 0 {
-                (StatusCode::NotFound, "")
+            return if deletes == 0 {
+                response.send(StatusCode::NotFound)
             } else if deletes > 1 {
-                (StatusCode::InternalServerError, "More than one deletion?")
+                response.error(StatusCode::InternalServerError, "More than one deletion?")
             } else {
                 println!("DELETED TODO {}", uid);
-                (StatusCode::Ok, "{}")
+                response.send(Json::from_str("{}"))
             }
         }
 
         patch "/todos/:uid" => |request, response| {
-            match find_todo(request) {
-                None => return response.error(StatusCode::NotFound, ""),
+            // `return` is used as these match arms all return `MiddlewareResult`
+            // and it won't implement `Responder`, so we short circuit the closure
+            return match find_todo(request) {
+                None => response.send(StatusCode::NotFound),
                 Some(mut todo) => {
                     let diff = request.json_as::<Todo>().unwrap();
                     todo.merge(diff);
@@ -147,11 +149,11 @@ pub fn main() {
                                                 &todo.uid().unwrap()]).unwrap();
 
                     if changes == 0 {
-                        return response.error(StatusCode::NotFound, "")
+                        response.send(StatusCode::NotFound)
                     } else if changes > 1 {
-                        return response.error(StatusCode::InternalServerError, "Too many items patched")
+                        response.error(StatusCode::InternalServerError, "Too many items patched")
                     } else {
-                        todo
+                        response.send(todo)
                     }
                 }
             }
