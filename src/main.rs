@@ -91,7 +91,11 @@ pub fn main() {
         }
 
         post "/todos" => |request, response| {
-            let mut todo = request.json_as::<Todo>().unwrap();
+            let mut todo = match request.json_as::<Todo>() {
+                Ok(todo) => todo,
+                Err(e) => return response.error(StatusCode::BadRequest, format!("{}", e))
+            };
+
             let db_conn = request.db_conn();
             let stmt = db_conn.prepare("INSERT INTO todos (title, order_idx, completed) VALUES ( $1, $2, $3 ) RETURNING uid").unwrap();
 
@@ -138,8 +142,10 @@ pub fn main() {
             return match find_todo(request) {
                 None => response.send(StatusCode::NotFound),
                 Some(mut todo) => {
-                    let diff = request.json_as::<Todo>().unwrap();
-                    todo.merge(diff);
+                    match request.json_as::<Todo>() {
+                        Ok(diff) => todo.merge(diff),
+                        Err(e) => return response.error(StatusCode::BadRequest, format!("{}", e))
+                    }
 
                     let db_conn = request.db_conn();
                     let stmt = db_conn.prepare("UPDATE todos SET title = $1, order_idx = $2, completed = $3 WHERE uid = $4").unwrap();
