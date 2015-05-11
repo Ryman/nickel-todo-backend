@@ -39,7 +39,7 @@ lazy_static! {
 
 fn find_todo(request: &Request) -> Option<Todo> {
     let db_conn = request.db_conn();
-    let stmt = db_conn.prepare("SELECT uid, title, order_idx, completed FROM todos WHERE uid = $1").unwrap();
+    let stmt = db_conn.prepare_cached("SELECT uid, title, order_idx, completed FROM todos WHERE uid = $1").unwrap();
     let uid = request.param("uid").trim().parse::<i32>().unwrap();
     let mut iter = stmt.query(&[&uid]).unwrap().into_iter();
 
@@ -73,7 +73,7 @@ pub fn main() {
     server.utilize(router! {
         get "/todos" => |request, response| {
             let db_conn = request.db_conn();
-            let stmt = db_conn.prepare("SELECT uid, title, order_idx, completed FROM todos").unwrap();
+            let stmt = db_conn.prepare_cached("SELECT uid, title, order_idx, completed FROM todos").unwrap();
 
             stmt.query(&[])
                 .unwrap()
@@ -97,7 +97,7 @@ pub fn main() {
             };
 
             let db_conn = request.db_conn();
-            let stmt = db_conn.prepare("INSERT INTO todos (title, order_idx, completed) VALUES ( $1, $2, $3 ) RETURNING uid").unwrap();
+            let stmt = db_conn.prepare_cached("INSERT INTO todos (title, order_idx, completed) VALUES ( $1, $2, $3 ) RETURNING uid").unwrap();
 
             let mut iter = stmt.query(&[&todo.title(),
                                         &todo.order(),
@@ -148,7 +148,7 @@ pub fn main() {
                     }
 
                     let db_conn = request.db_conn();
-                    let stmt = db_conn.prepare("UPDATE todos SET title = $1, order_idx = $2, completed = $3 WHERE uid = $4").unwrap();
+                    let stmt = db_conn.prepare_cached("UPDATE todos SET title = $1, order_idx = $2, completed = $3 WHERE uid = $4").unwrap();
                     let changes = stmt.execute(&[&todo.title(),
                                                 &todo.order(),
                                                 &todo.completed(),
