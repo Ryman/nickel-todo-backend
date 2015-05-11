@@ -5,7 +5,7 @@ version = "0.0.1"
 authors = ["Kevin Butler <haqkrs@gmail.com>"]
 
 [dependencies]
-nickel = "*"
+# nickel = "*"
 postgres = "*"
 lazy_static = "*"
 rustc-serialize = "*"
@@ -15,5 +15,11 @@ r2d2 = "*"
 time = "*"
 hyper = "*"
 
+[dependencies.nickel]
+
+git = "https://github.com/Ryman/nickel.rs"
+branch = "dev"
+
 [dependencies.nickel_postgres]
-git = "https://github.com/nickel-org/nickel-postgres.git"
+git = "https://github.com/Ryman/nickel-postgres.git"
+branch = "dev"

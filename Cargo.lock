@@ -4,8 +4,8 @@ version = "0.0.1"
 dependencies = [
  "hyper 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "lazy_static 0.1.10 (registry+https://github.com/rust-lang/crates.io-index)",
- "nickel 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "nickel_postgres 0.0.0 (git+https://github.com/nickel-org/nickel-postgres.git)",
+ "nickel 0.3.0 (git+https://github.com/Ryman/nickel.rs?branch=dev)",
+ "nickel_postgres 0.0.0 (git+https://github.com/Ryman/nickel-postgres.git?branch=dev)",
  "openssl 0.6.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "postgres 0.8.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "r2d2 0.5.7 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -119,6 +119,11 @@ dependencies = [
 ]
 
 [[package]]
+name = "modifier"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
 name = "mustache"
 version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -130,12 +135,13 @@ dependencies = [
 [[package]]
 name = "nickel"
 version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
+source = "git+https://github.com/Ryman/nickel.rs?branch=dev#57d79e418ef938d83b1c25fe6a8d1d3238c39d2c"
 dependencies = [
  "groupable 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "hyper 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "lazy_static 0.1.10 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "modifier 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "mustache 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "plugin 0.2.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "regex 0.1.30 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -148,9 +154,9 @@ dependencies = [
 [[package]]
 name = "nickel_postgres"
 version = "0.0.0"
-source = "git+https://github.com/nickel-org/nickel-postgres.git#e98907f3b8d9f49fc9903ef8868c3b0fb3b68538"
+source = "git+https://github.com/Ryman/nickel-postgres.git?branch=dev#702aee251f7e5e80262f2aff251309088b8bcc75"
 dependencies = [
- "nickel 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "nickel 0.3.0 (git+https://github.com/Ryman/nickel.rs?branch=dev)",
  "openssl 0.6.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "plugin 0.2.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "postgres 0.8.8 (registry+https://github.com/rust-lang/crates.io-index)",
