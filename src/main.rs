@@ -8,20 +8,20 @@ extern crate unicase;
 extern crate hyper;
 extern crate r2d2;
 
-use nickel::{Nickel, Request, QueryString, HttpRouter, JsonBody};
+use nickel::{Nickel, HttpRouter, JsonBody};
 use nickel::status::StatusCode;
 
 use std::env;
 use hyper::header;
 use unicase::UniCase;
-use nickel_postgres::{PostgresMiddleware, PostgresRequestExtensions};
-use postgres::SslMode;
-use openssl::ssl::{SslMethod, SslContext};
+use nickel_postgres::PostgresRequestExtensions;
 use rustc_serialize::json::{Json, ToJson};
 
 use todo::Todo;
+use datastore::DataStore;
 
 mod todo;
+mod datastore;
 
 lazy_static! {
     pub static ref SITE_ROOT_URL: String = {
@@ -37,24 +37,6 @@ lazy_static! {
     };
 }
 
-fn find_todo(request: &Request) -> Option<Todo> {
-    let db_conn = request.db_conn();
-    let stmt = db_conn.prepare_cached("SELECT uid, title, order_idx, completed FROM todos WHERE uid = $1").unwrap();
-    let uid = request.param("uid").trim().parse::<i32>().unwrap();
-    let mut iter = stmt.query(&[&uid]).unwrap().into_iter();
-
-    match (iter.next(), iter.next()) {
-        (Some(row), None) => Some(Todo::from(row)),
-        // Just a 404
-        (None, None) => None,
-        // Shouldn't get multiple for a uid
-        (Some(_), Some(_)) | (None, Some(_)) => {
-            println!("BADBAD: {:?} gave multiple results", uid);
-            None
-        }
-    }
-}
-
 pub fn main() {
     let mut server = Nickel::new();
 
@@ -68,25 +50,21 @@ pub fn main() {
         response.set(header::AccessControlAllowOrigin::Any);
     });
 
-    server.utilize(db_middleware());
+    server.utilize(datastore::setup());
 
     server.utilize(router! {
         get "/todos" => |request, response| {
-            let db_conn = request.db_conn();
-            let stmt = db_conn.prepare_cached("SELECT uid, title, order_idx, completed FROM todos").unwrap();
-
-            stmt.query(&[])
-                .unwrap()
-                .into_iter()
-                .map(Todo::from)
-                .collect::<Vec<_>>()
-                .to_json()
+            match Todo::all(&*request.db_conn()) {
+                Ok(todos) => todos.to_json(),
+                Err(code) => return response.send(code)
+            }
         }
 
         get "/todos/:uid" => |request, response| {
-            match find_todo(request) {
-                Some(todo) => todo,
-                None => return response.error(StatusCode::NotFound, "{}")
+            let uid = request.param("uid").trim().parse().unwrap();
+            match Todo::find_by_id(&*request.db_conn(), uid) {
+                Ok(todo) => todo,
+                Err(errcode) => return response.error(errcode, "{}")
             }
         }
 
@@ -96,70 +74,45 @@ pub fn main() {
                 Err(e) => return response.error(StatusCode::BadRequest, format!("{}", e))
             };
 
-            let db_conn = request.db_conn();
-            let stmt = db_conn.prepare_cached("INSERT INTO todos (title, order_idx, completed) VALUES ( $1, $2, $3 ) RETURNING uid").unwrap();
-
-            let mut iter = stmt.query(&[&todo.title(),
-                                        &todo.order(),
-                                        &todo.completed()]).unwrap().into_iter();
-
-            match (iter.next(), iter.next()) {
-                (Some(select), None) => {
-                    todo.set_uid(select.get(0));
-                    todo
-                },
-                // Should have one and only one uid from an insert
-                _ => return response.error(StatusCode::InternalServerError, "Inserted row count != 1")
+            match todo.save(&*request.db_conn()) {
+                Ok(()) => todo,
+                Err(errcode) => return response.send(errcode)
             }
         }
 
         delete "/todos" => |request, response| {
-            request.db_conn()
-                   .execute("TRUNCATE todos", &[])
-                   .unwrap();
-            Json::from_str("{}").unwrap()
+            match Todo::delete_all(&*request.db_conn()) {
+                Ok(()) => Json::from_str("{}"),
+                Err(errcode) => return response.send(errcode)
+            }
         }
 
         delete "/todos/:uid" => |request, response| {
-            let db_conn = request.db_conn();
-            let uid = request.param("uid").trim().parse::<i32>().unwrap();
-            let deletes = db_conn.execute("DELETE FROM todos * WHERE uid = $1",
-                                          &[&uid]).unwrap();
+            let uid = request.param("uid").trim().parse().unwrap();
 
-            return if deletes == 0 {
-                response.send(StatusCode::NotFound)
-            } else if deletes > 1 {
-                response.error(StatusCode::InternalServerError, "More than one deletion?")
-            } else {
-                println!("DELETED TODO {}", uid);
-                response.send(Json::from_str("{}"))
+            return match Todo::delete_by_id(&*request.db_conn(), uid) {
+                Ok(()) => response.send(Json::from_str("{}")),
+                Err(errcode) => response.send(errcode)
             }
         }
 
         patch "/todos/:uid" => |request, response| {
+            let uid = request.param("uid").trim().parse().unwrap();
+            let todo = Todo::find_by_id(&*request.db_conn(), uid); // borrowck
+
             // `return` is used as these match arms all return `MiddlewareResult`
             // and it won't implement `Responder`, so we short circuit the closure
-            return match find_todo(request) {
-                None => response.send(StatusCode::NotFound),
-                Some(mut todo) => {
+            return match todo {
+                Err(errcode) => response.send(errcode),
+                Ok(mut todo) => {
                     match request.json_as::<Todo>() {
                         Ok(diff) => todo.merge(diff),
                         Err(e) => return response.error(StatusCode::BadRequest, format!("{}", e))
                     }
 
-                    let db_conn = request.db_conn();
-                    let stmt = db_conn.prepare_cached("UPDATE todos SET title = $1, order_idx = $2, completed = $3 WHERE uid = $4").unwrap();
-                    let changes = stmt.execute(&[&todo.title(),
-                                                &todo.order(),
-                                                &todo.completed(),
-                                                &todo.uid().unwrap()]).unwrap();
-
-                    if changes == 0 {
-                        response.send(StatusCode::NotFound)
-                    } else if changes > 1 {
-                        response.error(StatusCode::InternalServerError, "Too many items patched")
-                    } else {
-                        response.send(todo)
+                    match todo.save(&*request.db_conn()) {
+                        Ok(()) => response.send(todo),
+                        Err(errcode) => response.send(errcode)
                     }
                 }
             }
@@ -183,25 +136,4 @@ pub fn main() {
     // Get port from heroku env
     let port = env::var("PORT").unwrap_or_else(|_| "6767".to_string());
     server.listen(&*format!("0.0.0.0:{}", port));
-}
-
-//initialise database tables, if has not already been done
-fn db_middleware() -> PostgresMiddleware {
-    let ssl_context = SslContext::new(SslMethod::Tlsv1).unwrap();
-    let url = env::var("DATABASE_URL").unwrap();
-    let db = PostgresMiddleware::new(&*url,
-                                     SslMode::Prefer(ssl_context),
-                                     5,
-                                     Box::new(r2d2::NoopErrorHandler)).unwrap();
-
-    {
-        let connection = db.pool.get().unwrap();
-        connection.execute("CREATE TABLE IF NOT EXISTS todos (
-                                uid SERIAL PRIMARY KEY,
-                                title VARCHAR NOT NULL,
-                                order_idx INTEGER DEFAULT 0,
-                                completed BOOL DEFAULT FALSE)", &[]).unwrap();
-    }
-
-    db
 }
