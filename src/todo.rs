@@ -5,7 +5,7 @@ use postgres;
 
 use SITE_ROOT_URL;
 
-#[derive(RustcDecodable)]
+#[derive(Debug, RustcDecodable)]
 pub struct Todo {
     uid: Option<i32>,
     title: Option<String>,
@@ -34,7 +34,7 @@ impl Todo {
         self.completed.unwrap_or(false)
     }
 
-    pub fn merge(&mut self, other: Todo) {
+    pub fn merge(&mut self, other: Todo) -> &mut Todo {
         if other.title.is_some() {
             self.title = other.title;
         }
@@ -44,6 +44,8 @@ impl Todo {
         if other.completed.is_some() {
             self.completed = other.completed
         }
+
+        self
     }
 }
 

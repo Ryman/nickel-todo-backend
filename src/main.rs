@@ -8,10 +8,11 @@ extern crate unicase;
 extern crate hyper;
 extern crate r2d2;
 
-use nickel::{Nickel, HttpRouter, JsonBody};
+use nickel::{Nickel, Request, HttpRouter, JsonBody};
 use nickel::status::StatusCode;
 
-use std::env;
+use std::{env, io};
+use std::num::ParseIntError;
 use hyper::header;
 use unicase::UniCase;
 use nickel_postgres::PostgresRequestExtensions;
@@ -37,6 +38,14 @@ lazy_static! {
     };
 }
 
+fn parse_uid(request: &Request) -> Result<i32, (StatusCode, ParseIntError)> {
+    request.param("uid").trim().parse().map_err(|e| (StatusCode::BadRequest, e))
+}
+
+fn parse_todo(request: &mut Request) -> Result<Todo, (StatusCode, io::Error)> {
+    request.json_as().map_err(|e| (StatusCode::BadRequest, e))
+}
+
 pub fn main() {
     let mut server = Nickel::new();
 
@@ -54,68 +63,44 @@ pub fn main() {
 
     server.utilize(router! {
         get "/todos" => |request, response| {
-            match Todo::all(&*request.db_conn()) {
-                Ok(todos) => todos.to_json(),
-                Err(code) => return response.send(code)
-            }
+            let todos = try_with!(response, Todo::all(&*request.db_conn()));
+            todos.to_json()
         }
 
         get "/todos/:uid" => |request, response| {
-            let uid = request.param("uid").trim().parse().unwrap();
-            match Todo::find_by_id(&*request.db_conn(), uid) {
-                Ok(todo) => todo,
-                Err(errcode) => return response.error(errcode, "{}")
-            }
+            let uid = try_with!(response, parse_uid(request));
+
+            Todo::find_by_id(&*request.db_conn(), uid)
         }
 
         post "/todos" => |request, response| {
-            let mut todo = match request.json_as::<Todo>() {
-                Ok(todo) => todo,
-                Err(e) => return response.error(StatusCode::BadRequest, format!("{}", e))
-            };
-
-            match todo.save(&*request.db_conn()) {
-                Ok(()) => todo,
-                Err(errcode) => return response.send(errcode)
-            }
+            let mut todo = try_with!(response, parse_todo(request));
+            try_with!(response, todo.save(&*request.db_conn()));
+            todo
         }
 
         delete "/todos" => |request, response| {
-            match Todo::delete_all(&*request.db_conn()) {
-                Ok(()) => Json::from_str("{}"),
-                Err(errcode) => return response.send(errcode)
-            }
+            try_with!(response, Todo::delete_all(&*request.db_conn()));
+
+            Json::from_str("{}").unwrap()
         }
 
         delete "/todos/:uid" => |request, response| {
-            let uid = request.param("uid").trim().parse().unwrap();
+            let uid = try_with!(response, parse_uid(request));
 
-            return match Todo::delete_by_id(&*request.db_conn(), uid) {
-                Ok(()) => response.send(Json::from_str("{}")),
-                Err(errcode) => response.send(errcode)
-            }
+            try_with!(response, Todo::delete_by_id(&*request.db_conn(), uid));
+
+            Json::from_str("{}").unwrap()
         }
 
         patch "/todos/:uid" => |request, response| {
-            let uid = request.param("uid").trim().parse().unwrap();
-            let todo = Todo::find_by_id(&*request.db_conn(), uid); // borrowck
+            let diff = try_with!(response, parse_todo(request));
+            let uid = try_with!(response, parse_uid(request));
 
-            // `return` is used as these match arms all return `MiddlewareResult`
-            // and it won't implement `Responder`, so we short circuit the closure
-            return match todo {
-                Err(errcode) => response.send(errcode),
-                Ok(mut todo) => {
-                    match request.json_as::<Todo>() {
-                        Ok(diff) => todo.merge(diff),
-                        Err(e) => return response.error(StatusCode::BadRequest, format!("{}", e))
-                    }
-
-                    match todo.save(&*request.db_conn()) {
-                        Ok(()) => response.send(todo),
-                        Err(errcode) => response.send(errcode)
-                    }
-                }
-            }
+            let conn = &*request.db_conn();
+            let mut todo = try_with!(response, Todo::find_by_id(conn, uid));
+            try_with!(response, todo.merge(diff).save(conn));
+            todo
         }
 
         options "/todos" => |_, mut res| {
