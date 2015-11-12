@@ -39,7 +39,9 @@ lazy_static! {
 }
 
 fn parse_uid(request: &Request) -> Result<i32, (StatusCode, ParseIntError)> {
-    request.param("uid").trim().parse().map_err(|e| (StatusCode::BadRequest, e))
+    let uid = request.param("uid").unwrap_or("");
+    let uid = uid.trim().parse();
+    uid.map_err(|e| (StatusCode::BadRequest, e))
 }
 
 fn parse_todo(request: &mut Request) -> Result<Todo, (StatusCode, io::Error)> {

@@ -11,9 +11,9 @@ pub fn setup() -> PostgresMiddleware {
     let ssl_context = SslContext::new(SslMethod::Tlsv1).unwrap();
     let url = env::var("DATABASE_URL").unwrap();
     let db = PostgresMiddleware::new(&*url,
-                                     SslMode::Prefer(ssl_context),
+                                     SslMode::Prefer(Box::new(ssl_context)),
                                      10,
-                                     Box::new(r2d2::NoopErrorHandler)).unwrap();
+                                     Box::new(r2d2::NopErrorHandler)).unwrap();
 
     {
         let connection = db.pool.get().unwrap();
@@ -27,7 +27,7 @@ pub fn setup() -> PostgresMiddleware {
     db
 }
 
-pub trait DataStore {
+pub trait DataStore : Sized {
     type Id;
     type Connection;
     type Error;

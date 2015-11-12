@@ -1,7 +1,7 @@
 use nickel::{Response, Responder, MiddlewareResult};
 use rustc_serialize::json::{self, Json, ToJson};
 use std::collections::BTreeMap;
-use postgres;
+use postgres::rows::Row as DatabaseRow;
 
 use SITE_ROOT_URL;
 
@@ -49,8 +49,8 @@ impl Todo {
     }
 }
 
-impl<'a> From<postgres::Row<'a>> for Todo {
-    fn from(row: postgres::Row) -> Todo {
+impl<'a> From<DatabaseRow<'a>> for Todo {
+    fn from(row: DatabaseRow) -> Todo {
         Todo {
             uid: row.get(0),
             title: Some(row.get(1)),
@@ -60,8 +60,8 @@ impl<'a> From<postgres::Row<'a>> for Todo {
     }
 }
 
-impl Responder for Todo {
-    fn respond<'a>(self, response: Response<'a>) -> MiddlewareResult<'a> {
+impl<D> Responder<D> for Todo {
+    fn respond<'a>(self, response: Response<'a, D>) -> MiddlewareResult<'a, D> {
         response.send(self.to_json())
     }
 }
