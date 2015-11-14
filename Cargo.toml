@@ -5,15 +5,14 @@ version = "0.0.1"
 authors = ["Kevin Butler <haqkrs@gmail.com>"]
 
 [dependencies]
-# nickel = "*"
 postgres = { version = "0.10", features = ["openssl"] }
-lazy_static = "*"
-rustc-serialize = "*"
-unicase = "*"
-openssl = "*"
-r2d2 = "*"
-time = "*"
-hyper = "*"
+lazy_static = "0.1"
+rustc-serialize = "0.3"
+unicase = "1.0"
+openssl = "0.6"
+r2d2 = "0.6"
+time = "0.1"
+hyper = "0.6"
 nickel = "0.7"
 
 [dependencies.nickel_postgres]
