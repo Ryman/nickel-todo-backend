@@ -1,4 +1,1 @@
-URL="https://static.rust-lang.org/dist/rust-nightly-x86_64-unknown-linux-gnu.tar.gz"
-VERSION="11-05-2015"
-CARGO_URL="https://static.rust-lang.org/cargo-dist/cargo-nightly-x86_64-unknown-linux-gnu.tar.gz"
-CARGO_VERSION="11-05-2015"
+VERSION="1.4.0"
